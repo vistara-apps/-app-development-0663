@@ -1,56 +1,221 @@
-import React from 'react'
-import { Zap, User, Settings } from 'lucide-react'
+import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Zap, Menu, X, User, LogOut, Settings, CreditCard } from 'lucide-react';
 
-const Header = ({ currentView, setCurrentView }) => {
+const Header = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const { user, logout, subscription } = useAuth();
+  const location = useLocation();
+  
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+    if (isProfileOpen) setIsProfileOpen(false);
+  };
+  
+  const toggleProfile = () => {
+    setIsProfileOpen(!isProfileOpen);
+    if (isMenuOpen) setIsMenuOpen(false);
+  };
+  
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+  
+  const isActive = (path) => {
+    return location.pathname === path;
+  };
+  
   return (
-    <header className="glass-card border-b border-white/20">
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Zap className="h-8 w-8 text-white" />
-              <h1 className="text-2xl font-bold text-white">MemeMaster AI</h1>
+    <header className="bg-black/20 backdrop-blur-lg border-b border-white/10">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo */}
+          <Link to="/" className="flex items-center space-x-2">
+            <div className="bg-gradient-to-r from-purple-500 to-blue-500 p-1.5 rounded-md">
+              <Zap className="h-5 w-5 text-white" />
             </div>
-            <nav className="hidden md:flex space-x-6">
+            <span className="text-white font-bold text-xl">MemeMaster AI</span>
+          </Link>
+          
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex space-x-6">
+            <Link
+              to="/"
+              className={`text-sm font-medium ${
+                isActive('/') ? 'text-white' : 'text-white/70 hover:text-white'
+              }`}
+            >
+              Dashboard
+            </Link>
+            <Link
+              to="/generator"
+              className={`text-sm font-medium ${
+                isActive('/generator') ? 'text-white' : 'text-white/70 hover:text-white'
+              }`}
+            >
+              Meme Generator
+            </Link>
+            <Link
+              to="/subscription"
+              className={`text-sm font-medium ${
+                isActive('/subscription') ? 'text-white' : 'text-white/70 hover:text-white'
+              }`}
+            >
+              Subscription
+            </Link>
+          </nav>
+          
+          {/* User Menu (Desktop) */}
+          <div className="hidden md:flex items-center space-x-4">
+            {subscription && subscription.tier !== 'free' && (
+              <div className="bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                {subscription.tier.toUpperCase()}
+              </div>
+            )}
+            
+            <div className="relative">
               <button
-                onClick={() => setCurrentView('dashboard')}
-                className={`px-4 py-2 rounded-lg transition-all duration-200 ${
-                  currentView === 'dashboard'
-                    ? 'bg-white/20 text-white'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
+                onClick={toggleProfile}
+                className="flex items-center space-x-2 text-white/80 hover:text-white focus:outline-none"
               >
-                Dashboard
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                  <User className="h-4 w-4 text-white" />
+                </div>
+                <span className="text-sm font-medium">{user?.email?.split('@')[0]}</span>
               </button>
-              <button
-                onClick={() => setCurrentView('generator')}
-                className={`px-4 py-2 rounded-lg transition-all duration-200 ${
-                  currentView === 'generator'
-                    ? 'bg-white/20 text-white'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                Create Meme
-              </button>
-            </nav>
+              
+              {isProfileOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-gray-900 rounded-lg shadow-lg py-1 z-10 border border-white/10">
+                  <div className="px-4 py-2 border-b border-white/10">
+                    <p className="text-sm text-white font-medium truncate">{user?.email}</p>
+                    <p className="text-xs text-white/60">
+                      {subscription?.tier ? `${subscription.tier.charAt(0).toUpperCase() + subscription.tier.slice(1)} Plan` : 'Free Plan'}
+                    </p>
+                  </div>
+                  <Link
+                    to="/subscription"
+                    className="block px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5"
+                    onClick={() => setIsProfileOpen(false)}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <CreditCard className="h-4 w-4" />
+                      <span>Subscription</span>
+                    </div>
+                  </Link>
+                  <Link
+                    to="/settings"
+                    className="block px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5"
+                    onClick={() => setIsProfileOpen(false)}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Settings className="h-4 w-4" />
+                      <span>Settings</span>
+                    </div>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="block w-full text-left px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <LogOut className="h-4 w-4" />
+                      <span>Log Out</span>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           
-          <div className="flex items-center space-x-4">
-            <div className="hidden sm:flex items-center space-x-2 bg-white/10 rounded-lg px-3 py-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              <span className="text-white text-sm font-medium">Free Tier</span>
-            </div>
-            <button className="p-2 rounded-lg hover:bg-white/10 text-white transition-colors">
-              <Settings className="h-5 w-5" />
-            </button>
-            <button className="p-2 rounded-lg hover:bg-white/10 text-white transition-colors">
-              <User className="h-5 w-5" />
-            </button>
-          </div>
+          {/* Mobile Menu Button */}
+          <button
+            onClick={toggleMenu}
+            className="md:hidden text-white/80 hover:text-white focus:outline-none"
+          >
+            {isMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+          </button>
         </div>
       </div>
+      
+      {/* Mobile Menu */}
+      {isMenuOpen && (
+        <div className="md:hidden bg-black/20 backdrop-blur-lg border-t border-white/10">
+          <div className="container mx-auto px-4 py-3">
+            <nav className="flex flex-col space-y-3">
+              <Link
+                to="/"
+                className={`text-sm font-medium ${
+                  isActive('/') ? 'text-white' : 'text-white/70 hover:text-white'
+                }`}
+                onClick={toggleMenu}
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/generator"
+                className={`text-sm font-medium ${
+                  isActive('/generator') ? 'text-white' : 'text-white/70 hover:text-white'
+                }`}
+                onClick={toggleMenu}
+              >
+                Meme Generator
+              </Link>
+              <Link
+                to="/subscription"
+                className={`text-sm font-medium ${
+                  isActive('/subscription') ? 'text-white' : 'text-white/70 hover:text-white'
+                }`}
+                onClick={toggleMenu}
+              >
+                Subscription
+              </Link>
+              <div className="pt-2 border-t border-white/10">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                    <User className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-white font-medium truncate">{user?.email}</p>
+                    <p className="text-xs text-white/60">
+                      {subscription?.tier ? `${subscription.tier.charAt(0).toUpperCase() + subscription.tier.slice(1)} Plan` : 'Free Plan'}
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  to="/settings"
+                  className="flex items-center space-x-2 text-sm text-white/80 hover:text-white py-2"
+                  onClick={toggleMenu}
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>Settings</span>
+                </Link>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    toggleMenu();
+                  }}
+                  className="flex items-center space-x-2 text-sm text-white/80 hover:text-white py-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Log Out</span>
+                </button>
+              </div>
+            </nav>
+          </div>
+        </div>
+      )}
     </header>
-  )
-}
+  );
+};
 
-export default Header
+export default Header;
+

@@ -1,7 +1,12 @@
 import React from 'react'
 import { TrendingUp, Target, Users, Zap } from 'lucide-react'
+import { useMeme } from '../context/MemeContext'
 
-const EngagementCard = ({ score }) => {
+const EngagementCard = () => {
+  const { engagementScore: score, engagementMetrics, engagementInsights } = useMeme()
+  
+  if (!score) return null;
+  
   const getScoreColor = (score) => {
     if (score >= 80) return 'from-green-400 to-green-600'
     if (score >= 60) return 'from-yellow-400 to-yellow-600'
@@ -14,7 +19,13 @@ const EngagementCard = ({ score }) => {
     return 'Low Viral Potential'
   }
 
-  const metrics = [
+  // Use provided metrics if available, otherwise calculate them
+  const metrics = engagementMetrics ? [
+    { label: 'Shareability', value: engagementMetrics.shareability, icon: TrendingUp },
+    { label: 'Relatability', value: engagementMetrics.relatability, icon: Users },
+    { label: 'Timing', value: engagementMetrics.timing, icon: Target },
+    { label: 'Humor Score', value: engagementMetrics.humorScore, icon: Zap }
+  ] : [
     { label: 'Shareability', value: Math.floor(score * 0.9), icon: TrendingUp },
     { label: 'Relatability', value: Math.floor(score * 1.1), icon: Users },
     { label: 'Timing', value: Math.floor(score * 0.95), icon: Target },
@@ -96,12 +107,14 @@ const EngagementCard = ({ score }) => {
       <div className="mt-6 p-4 bg-white/5 rounded-lg">
         <h4 className="text-white font-medium mb-2">AI Insights</h4>
         <p className="text-white/70 text-sm">
-          {score >= 80 ? (
-            "This meme has excellent viral potential! The humor style and timing align well with current trends."
-          ) : score >= 60 ? (
-            "Good meme with decent shareability. Consider adjusting the humor style for better engagement."
-          ) : (
-            "This meme might need some tweaks. Try a different humor style or trending topic for better results."
+          {engagementInsights || (
+            score >= 80 ? (
+              "This meme has excellent viral potential! The humor style and timing align well with current trends."
+            ) : score >= 60 ? (
+              "Good meme with decent shareability. Consider adjusting the humor style for better engagement."
+            ) : (
+              "This meme might need some tweaks. Try a different humor style or trending topic for better results."
+            )
           )}
         </p>
       </div>

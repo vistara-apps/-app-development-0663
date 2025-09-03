@@ -26,6 +26,30 @@ export default {
       boxShadow: {
         'card': '0 4px 12px rgba(0,0,0,0.1)',
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            maxWidth: '65ch',
+            color: 'hsl(220 10% 15%)',
+            a: {
+              color: 'hsl(262 70% 55%)',
+              '&:hover': {
+                color: 'hsl(262 70% 45%)',
+              },
+            },
+          },
+        },
+      },
+    },
+    container: {
+      center: true,
+      padding: {
+        DEFAULT: '1rem',
+        sm: '2rem',
+        lg: '4rem',
+        xl: '5rem',
+        '2xl': '6rem',
+      },
     },
   },
   plugins: [],
