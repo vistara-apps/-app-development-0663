@@ -1,27 +1,120 @@
 import React from 'react'
 import { useMeme } from '../context/MemeContext'
-import { Download, Share2, RotateCcw, Heart } from 'lucide-react'
+import { Download, Share2, RotateCcw, Heart, AlertCircle } from 'lucide-react'
 
 const MemeDisplay = () => {
-  const { generatedMeme, isGenerating } = useMeme()
+  const { generatedMeme, isGenerating, error, regenerateMeme } = useMeme()
 
   const handleDownload = () => {
-    if (generatedMeme) {
-      // Mock download functionality
-      alert('Download feature coming soon!')
-    }
+    if (!generatedMeme) return;
+    
+    // Create a temporary canvas to combine image and text
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      // Set canvas dimensions to match image
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      // Draw image on canvas
+      ctx.drawImage(img, 0, 0);
+      
+      // Add caption text
+      ctx.fillStyle = 'white';
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = 2;
+      ctx.font = 'bold 24px Arial';
+      ctx.textAlign = 'center';
+      
+      // Split caption into lines if needed
+      const maxWidth = canvas.width - 40;
+      const words = generatedMeme.caption.split(' ');
+      const lines = [];
+      let currentLine = words[0];
+      
+      for (let i = 1; i < words.length; i++) {
+        const testLine = currentLine + ' ' + words[i];
+        const metrics = ctx.measureText(testLine);
+        
+        if (metrics.width > maxWidth) {
+          lines.push(currentLine);
+          currentLine = words[i];
+        } else {
+          currentLine = testLine;
+        }
+      }
+      lines.push(currentLine);
+      
+      // Draw text with stroke (outline)
+      const lineHeight = 30;
+      const y = canvas.height - (lines.length * lineHeight) - 20;
+      
+      lines.forEach((line, index) => {
+        const lineY = y + (index * lineHeight);
+        ctx.strokeText(line, canvas.width / 2, lineY);
+        ctx.fillText(line, canvas.width / 2, lineY);
+      });
+      
+      // Convert canvas to data URL and trigger download
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `meme-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    };
+    
+    img.onerror = () => {
+      alert('Failed to load image for download. Please try again.');
+    };
+    
+    img.src = generatedMeme.image;
   }
 
   const handleShare = () => {
-    if (generatedMeme) {
-      // Mock share functionality
-      alert('Share feature coming soon!')
+    if (!generatedMeme) return;
+    
+    // Check if Web Share API is available
+    if (navigator.share) {
+      // Create a blob from the image
+      fetch(generatedMeme.image)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], 'meme.png', { type: 'image/png' });
+          
+          navigator.share({
+            title: 'Check out this meme I created with MemeMaster AI!',
+            text: generatedMeme.caption,
+            files: [file]
+          }).catch(err => {
+            console.error('Share failed:', err);
+            // Fallback to clipboard
+            copyToClipboard();
+          });
+        })
+        .catch(err => {
+          console.error('Failed to fetch image:', err);
+          // Fallback to clipboard
+          copyToClipboard();
+        });
+    } else {
+      // Fallback for browsers that don't support Web Share API
+      copyToClipboard();
     }
+  }
+  
+  const copyToClipboard = () => {
+    const shareText = `"${generatedMeme.caption}" - Created with MemeMaster AI`;
+    navigator.clipboard.writeText(shareText)
+      .then(() => alert('Meme caption copied to clipboard!'))
+      .catch(err => alert('Failed to copy to clipboard. Please try again.'));
   }
 
   const handleRegenerate = () => {
     if (generatedMeme) {
-      alert('Regeneration feature coming soon!')
+      regenerateMeme();
     }
   }
 
@@ -33,6 +126,21 @@ const MemeDisplay = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
             <p className="text-white/60">AI is crafting your meme...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="glass-card rounded-lg p-6">
+        <h3 className="text-xl font-semibold text-white mb-6">Generated Meme</h3>
+        <div className="aspect-square bg-white/5 rounded-lg flex items-center justify-center border-2 border-dashed border-red-400/40">
+          <div className="text-center p-6">
+            <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+            <p className="text-white font-medium mb-2">Error</p>
+            <p className="text-white/60">{error}</p>
           </div>
         </div>
       </div>

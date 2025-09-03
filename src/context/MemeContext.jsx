@@ -1,114 +1,219 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
+import { generateMemeCaption, predictEngagement, getTrendingTopics } from '../services/openai';
+import { createMemeImage } from '../utils/imageUtils';
+import { uploadMemeToIPFS } from '../services/pinata';
+import { saveMeme, getUserMemes } from '../services/supabase';
 
-const MemeContext = createContext()
+// Create the context
+const MemeContext = createContext();
 
+// Custom hook to use the meme context
 export const useMeme = () => {
-  const context = useContext(MemeContext)
+  const context = useContext(MemeContext);
   if (!context) {
-    throw new Error('useMeme must be used within a MemeProvider')
+    throw new Error('useMeme must be used within a MemeProvider');
   }
-  return context
-}
+  return context;
+};
 
+// Meme provider component
 export const MemeProvider = ({ children }) => {
-  const [generatedMeme, setGeneratedMeme] = useState(null)
-  const [humorStyle, setHumorStyle] = useState('witty')
-  const [engagementScore, setEngagementScore] = useState(null)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generationCount, setGenerationCount] = useState(3) // Free tier limit
-
-  // Mock trending topics
-  const [trendingTopics] = useState([
-    { topic: 'AI Revolution', score: 95, trend: 'up' },
-    { topic: 'Space Exploration', score: 87, trend: 'up' },
-    { topic: 'Climate Tech', score: 78, trend: 'stable' },
-    { topic: 'Gaming Culture', score: 92, trend: 'up' },
-    { topic: 'Remote Work', score: 65, trend: 'down' }
-  ])
-
-  const generateMeme = async (input, type = 'text') => {
-    if (generationCount <= 0) {
-      alert('Generation limit reached! Upgrade to Pro for more.')
-      return
-    }
-
-    setIsGenerating(true)
-    
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // Mock meme generation based on humor style
-      const mockCaptions = {
-        witty: [
-          "When you realize AI is better at making memes than you",
-          "That moment when the code works on the first try",
-          "Me explaining why I need 47 browser tabs open"
-        ],
-        absurd: [
-          "Potato contemplating the meaning of french fries",
-          "When your coffee machine judges your life choices",
-          "Local man discovers gravity, falls down immediately"
-        ],
-        dry: [
-          "Another day, another existential crisis",
-          "Productivity: 0%. Procrastination: Legendary.",
-          "Success is 1% inspiration, 99% caffeine"
-        ],
-        edgy: [
-          "Breaking: Local person has controversial opinion",
-          "Plot twist: Nobody asked",
-          "Certified chaos merchant at your service"
-        ]
+  const { user, getRemainingGenerations } = useAuth();
+  
+  const [generatedMeme, setGeneratedMeme] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState(null);
+  const [humorStyle, setHumorStyle] = useState('witty');
+  const [engagementScore, setEngagementScore] = useState(null);
+  const [engagementMetrics, setEngagementMetrics] = useState(null);
+  const [engagementInsights, setEngagementInsights] = useState(null);
+  const [trendingTopics, setTrendingTopics] = useState([]);
+  const [userMemes, setUserMemes] = useState([]);
+  const [generationCount, setGenerationCount] = useState(3); // Default to free tier
+  
+  // Load trending topics
+  useEffect(() => {
+    const loadTrendingTopics = async () => {
+      try {
+        const topics = await getTrendingTopics();
+        setTrendingTopics(topics);
+      } catch (err) {
+        console.error('Error loading trending topics:', err);
       }
-
-      const captions = mockCaptions[humorStyle] || mockCaptions.witty
-      const randomCaption = captions[Math.floor(Math.random() * captions.length)]
+    };
+    
+    loadTrendingTopics();
+  }, []);
+  
+  // Load user memes
+  useEffect(() => {
+    const loadUserMemes = async () => {
+      if (!user) return;
       
-      // Calculate engagement score based on humor style and trending topics
-      const baseScore = Math.floor(Math.random() * 40) + 60
-      const trendBonus = trendingTopics.some(topic => 
-        input.toLowerCase().includes(topic.topic.toLowerCase())
-      ) ? 15 : 0
+      try {
+        const memes = await getUserMemes(user.id);
+        setUserMemes(memes);
+      } catch (err) {
+        console.error('Error loading user memes:', err);
+      }
+    };
+    
+    loadUserMemes();
+  }, [user]);
+  
+  // Update generation count based on subscription
+  useEffect(() => {
+    if (getRemainingGenerations) {
+      setGenerationCount(getRemainingGenerations());
+    }
+  }, [getRemainingGenerations]);
+  
+  // Generate a meme
+  const generateMeme = async (input, type) => {
+    try {
+      setIsGenerating(true);
+      setError(null);
       
-      const finalScore = Math.min(baseScore + trendBonus, 99)
+      // Check if user has generations remaining
+      if (generationCount <= 0) {
+        throw new Error('You have reached your daily generation limit. Upgrade to generate more memes.');
+      }
       
+      let prompt, imageUrl;
+      
+      if (type === 'text') {
+        prompt = input;
+        // In a real implementation, we would generate an image based on the prompt
+        // For now, we'll use a placeholder image
+        imageUrl = 'https://via.placeholder.com/800x600/1a1a2e/ffffff?text=AI+Generated+Meme';
+      } else if (type === 'upload') {
+        // For uploaded images, we would use the image as is
+        imageUrl = URL.createObjectURL(input);
+        prompt = 'Uploaded image';
+      } else {
+        throw new Error('Invalid input type');
+      }
+      
+      // Generate caption
+      const caption = await generateMemeCaption(prompt, humorStyle);
+      
+      // Create meme image with caption
+      const memeImageUrl = await createMemeImage(imageUrl, caption);
+      
+      // Predict engagement
+      const engagement = await predictEngagement(caption, prompt, humorStyle, trendingTopics);
+      
+      // Set state
       setGeneratedMeme({
-        id: Date.now(),
-        caption: randomCaption,
-        image: type === 'upload' ? input : 'https://via.placeholder.com/400x300/667eea/ffffff?text=Generated+Meme',
-        prompt: type === 'text' ? input : 'Uploaded image',
+        caption,
+        image: memeImageUrl,
+        prompt,
         humorStyle,
         timestamp: new Date().toISOString()
-      })
+      });
+      setEngagementScore(engagement.score);
+      setEngagementMetrics(engagement.metrics);
+      setEngagementInsights(engagement.insights);
       
-      setEngagementScore(finalScore)
-      setGenerationCount(prev => prev - 1)
+      // Decrement generation count
+      setGenerationCount(prevCount => Math.max(0, prevCount - 1));
       
-    } catch (error) {
-      console.error('Meme generation failed:', error)
-      alert('Failed to generate meme. Please try again.')
+      return {
+        caption,
+        image: memeImageUrl,
+        prompt,
+        humorStyle,
+        engagementScore: engagement.score,
+        engagementMetrics: engagement.metrics,
+        engagementInsights: engagement.insights
+      };
+    } catch (err) {
+      console.error('Error generating meme:', err);
+      setError(err.message || 'Failed to generate meme. Please try again.');
+      throw err;
     } finally {
-      setIsGenerating(false)
+      setIsGenerating(false);
     }
-  }
-
+  };
+  
+  // Save a meme
+  const saveMemeToDatabase = async (meme) => {
+    try {
+      if (!user) {
+        throw new Error('You must be logged in to save memes');
+      }
+      
+      // Upload to IPFS
+      const ipfsData = await uploadMemeToIPFS(meme);
+      
+      // Save to database
+      const savedMeme = await saveMeme({
+        userId: user.id,
+        caption: meme.caption,
+        prompt: meme.prompt,
+        imageUrl: meme.image,
+        ipfsCid: ipfsData.imageCID,
+        ipfsMetadataCid: ipfsData.metadataCID,
+        humorStyle: meme.humorStyle,
+        engagementScore: meme.engagementScore
+      });
+      
+      // Update user memes
+      setUserMemes(prevMemes => [savedMeme, ...prevMemes]);
+      
+      return savedMeme;
+    } catch (err) {
+      console.error('Error saving meme:', err);
+      setError(err.message || 'Failed to save meme. Please try again.');
+      throw err;
+    }
+  };
+  
+  // Delete a meme
+  const deleteMeme = async (memeId) => {
+    try {
+      if (!user) {
+        throw new Error('You must be logged in to delete memes');
+      }
+      
+      // Delete from database
+      await deleteMeme(memeId);
+      
+      // Update user memes
+      setUserMemes(prevMemes => prevMemes.filter(meme => meme.id !== memeId));
+    } catch (err) {
+      console.error('Error deleting meme:', err);
+      setError(err.message || 'Failed to delete meme. Please try again.');
+      throw err;
+    }
+  };
+  
+  // Context value
   const value = {
     generatedMeme,
-    setGeneratedMeme,
+    isGenerating,
+    error,
     humorStyle,
     setHumorStyle,
     engagementScore,
-    setEngagementScore,
-    isGenerating,
-    generateMeme,
+    engagementMetrics,
+    engagementInsights,
+    trendingTopics,
+    userMemes,
     generationCount,
-    trendingTopics
-  }
-
+    generateMeme,
+    saveMemeToDatabase,
+    deleteMeme,
+    setError
+  };
+  
   return (
     <MemeContext.Provider value={value}>
       {children}
     </MemeContext.Provider>
-  )
-}
+  );
+};
+
+export default MemeContext;
+

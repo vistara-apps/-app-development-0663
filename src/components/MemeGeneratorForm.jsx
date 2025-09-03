@@ -1,12 +1,18 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useMeme } from '../context/MemeContext'
-import { Upload, Type, Sparkles } from 'lucide-react'
+import { Upload, Type, Sparkles, AlertCircle } from 'lucide-react'
 
 const MemeGeneratorForm = () => {
   const [inputType, setInputType] = useState('text')
   const [textPrompt, setTextPrompt] = useState('')
   const [uploadedImage, setUploadedImage] = useState(null)
-  const { generateMeme, isGenerating, generationCount } = useMeme()
+  const [inputError, setInputError] = useState(null)
+  const { generateMeme, isGenerating, generationCount, error } = useMeme()
+  
+  // Clear input error when input changes
+  useEffect(() => {
+    if (inputError) setInputError(null)
+  }, [textPrompt, uploadedImage])
 
   const handleImageUpload = (event) => {
     const file = event.target.files[0]
@@ -20,12 +26,29 @@ const MemeGeneratorForm = () => {
   }
 
   const handleGenerate = () => {
-    if (inputType === 'text' && textPrompt.trim()) {
+    // Clear any previous input errors
+    setInputError(null)
+    
+    // Validate input
+    if (inputType === 'text') {
+      if (!textPrompt.trim()) {
+        setInputError('Please enter a text prompt before generating a meme.')
+        return
+      }
+      
+      if (textPrompt.trim().length < 5) {
+        setInputError('Please enter a more detailed prompt (at least 5 characters).')
+        return
+      }
+      
       generateMeme(textPrompt, 'text')
-    } else if (inputType === 'upload' && uploadedImage) {
+    } else if (inputType === 'upload') {
+      if (!uploadedImage) {
+        setInputError('Please upload an image before generating a meme.')
+        return
+      }
+      
       generateMeme(uploadedImage, 'upload')
-    } else {
-      alert('Please provide input before generating a meme.')
     }
   }
 
@@ -111,6 +134,14 @@ const MemeGeneratorForm = () => {
         </div>
       )}
 
+      {/* Input Error Message */}
+      {inputError && (
+        <div className="mb-6 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-start space-x-2">
+          <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-white/90 text-sm">{inputError}</p>
+        </div>
+      )}
+      
       {/* Generation Info */}
       <div className="flex items-center justify-between mb-6">
         <div className="text-sm text-white/60">
